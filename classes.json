@@ -1,0 +1,26 @@
+[
+    {
+        "Class": "Druid",
+        "Weapons": "Crossbow",
+        "WeaponDamage": "2d6",
+        "Magic": "Whip Vine"
+    },
+    {
+        "Class": "Cat",
+        "Weapons": "Claws",
+        "WeaponDamage": "3d4 + 1",
+        "Magic": "Cuteness"
+    },
+    {
+        "Class": "Bard",
+        "Weapons": "Spoon",
+        "WeaponDamage": "d8",
+        "Magic": "Cat Calling"
+    },
+    {
+        "Class": "Barbarian",
+        "Weapons": "Great Axe",
+        "WeaponDamage": "3d6 + 2",
+        "Magic": "Yeet"
+    }
+]
