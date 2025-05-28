@@ -209,7 +209,7 @@ def main():
                 sock.send(resp.encode())
             # TODO: make this work
             elif lower == '!quest':
-                make_quests(level=)
+                make_quests()
                 resp = f"PRIVMSG {channel} :@{user} Your quest: Slay the dragon!\r\n"
                 sock.send(resp.encode())
 

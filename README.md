@@ -37,6 +37,14 @@ pip install flask python-dotenv requests
 python twitch_oauth_flow.py
 ```
 
+4. Set up channels to be run on (Do not remove the hashtag):
+Line 16, channel from '#Starry0Wolf' to '#YOUR-CHANNEL-HERE'
+
+5. Run the main file:
+```bash
+python main.py
+```
+
 ## File Structure
 
 - `main.py` - Main bot logic and command handling
