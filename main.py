@@ -157,17 +157,17 @@ def give_class(class_name, target_user):
         
         return True
 
-def has_class(target_user):
-    UserID = get_user_id(target_user)
-    try:
-        with open('players.json', 'r') as f:
-            players = json.load(f)
-        user_data = players.get(str(UserID))
-        if user_data and "class" in user_data:
-            return user_data["class"]
-        return None
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+# def has_class(target_user):
+#     UserID = get_user_id(target_user)
+#     try:
+#         with open('players.json', 'r') as f:
+#             players = json.load(f)
+#         user_data = players.get(str(UserID))
+#         if user_data and "class" in user_data:
+#             return user_data["class"]
+#         return None
+#     except (FileNotFoundError, json.JSONDecodeError):
+#         return None
     
 def get_player_info(target_user, lookingFor = None):
     """Get all player information including level, money, class, etc."""
@@ -192,17 +192,17 @@ def get_player_info(target_user, lookingFor = None):
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
-def get_level(target_user):
-    """Get player's current level."""
-    UserID = get_user_id(target_user)
-    try:
-        with open('players.json', 'r') as f:
-            players = json.load(f)
-        user_data = players.get(str(UserID))
-        if user_data and "level" in user_data:
-            return user_data["level"]
-        return None
-    except (FileNotFoundError, json.JSONDecodeError):
+# def get_level(target_user):
+#     """Get player's current level."""
+#     UserID = get_user_id(target_user)
+#     try:
+#         with open('players.json', 'r') as f:
+#             players = json.load(f)
+#         user_data = players.get(str(UserID))
+#         if user_data and "level" in user_data:
+#             return user_data["level"]
+#         return None
+#     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
 def make_quests(level):
@@ -266,7 +266,7 @@ def main():
                     resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>. After that you can rerun this command to do the quest!'\r\n"
                     sock.send(resp.encode())
                 else:
-                    currentLevel = get_level(target_user=user)
+                    currentLevel = get_player_info(target_user=user, lookingFor='class')
                     StartingBossStats = make_quests(level=currentLevel)
                     print(StartingBossStats)
                     print()
@@ -294,7 +294,7 @@ def main():
                 if len(parts) > 1:
                     selected_class = parts[1]
                     isClass = get_classes(selected_class)
-                    hasClass = has_class(user)  # <-- FIXED: pass user, not selected_class
+                    hasClass = get_player_info(target_user=user, lookingFor='class')  # <-- FIXED: pass user, not selected_class
                     print(hasClass)
                     # if hasClass is not None:
                     #     resp = f"PRIVMSG {channel} :@{user} Sorry! You already have a class, currently I have not added class switching! DM me to remind me to add it!\r\n"
@@ -401,7 +401,7 @@ def main():
                 sock.send(resp.encode())
 
             elif lower == '!level':
-                level = get_level(user)
+                level = get_player_info(target_user=user, lookingFor='level')
                 if level:
                     resp = f"PRIVMSG {channel} :@{user} You are level {level}!\r\n"
                 else:
