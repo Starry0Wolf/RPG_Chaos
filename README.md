@@ -1,7 +1,7 @@
 # RPG Chaos Bot
 
 A Twitch chat bot that implements RPG gameplay elements, inspired by the Ada RPG bot but with improved code organization and additional features.
-If there is anything you wanted added, please, create a issue in Github using the 'Feature Request' tag, or if there is a bug, create one with the 'Bug' tag.
+If there is anything you wanted added, please, create a issue in Github using the 'Enhancement' tag, or if there is a bug, create one with the 'Bug' tag.
 
 ## Features
 
