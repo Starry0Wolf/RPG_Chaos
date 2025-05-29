@@ -203,9 +203,25 @@ def get_level(target_user):
 def make_quests(level):
     Heathpoints = random.randint(10,100)
     #TODO: ADD MORE WEAPONS
-    Weapon = random.choice('gun', 'crossbow', 'long sword', 'great axe', 'ninja star')
-    Damage = random.randint(5,25)
-    return (Heathpoints, Weapon, Damage)
+    Weapon = random.choice(['gun', 'crossbow', 'long sword', 'great axe', 'ninja star'])
+    #TODO: MAKE BASE DAMAGE BASED OFF THE WEAPON
+    if random.randint(0,3) == 0:
+        Damage = {
+            "BaseDamage": random.randint(4,12),
+            "AddonDamage": random.randint(1,3)
+        }
+    else:
+        Damage = {
+            "BaseDamage": random.randint(4,12),
+            "AddonDamage": 0
+        }
+
+    Stats = {
+        "Damage": Damage,
+        "Weapon": Weapon,
+        "BaseHeath": Heathpoints
+    }
+    return Stats
 
 def main():
     sock = connect()
@@ -240,9 +256,17 @@ def main():
                 sock.send(resp.encode())
             # TODO: make this work
             elif lower == '!quest':
-                make_quests()
-                resp = f"PRIVMSG {channel} :@{user} Your quest: Slay the dragon!\r\n"
-                sock.send(resp.encode())
+                if get_player_info(user) == None:
+                    available_classes = get_classes()
+                    resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>. After that you can rerun this command to do the quest!'\r\n"
+                    sock.send(resp.encode())
+                else:
+                    currentLevel = get_level(target_user=user)
+                    StartingBossStats = make_quests(level=currentLevel)
+                    print(StartingBossStats)
+                    print()
+                    resp = f"PRIVMSG {channel} :@{user} Your quest: Slay the dragon!\r\n"
+                    sock.send(resp.encode())
 
             # 2) Pattern match: startswith 'bex' AND contains 'reeere'
             # elif lower.startswith('!chaos') and 'remind' in lower:
@@ -344,8 +368,6 @@ def main():
                 else:
                     resp = f"PRIVMSG {channel} :@{user} Usage: !so <username>\r\n"
                     sock.send(resp.encode())
-
-
 
 
             # 4) Other “!” commands or fallback
