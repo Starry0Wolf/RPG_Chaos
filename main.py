@@ -136,7 +136,7 @@ def get_classes(name_class=None):
             if [c for c in class_names if c.lower() == name_class.lower()]:
                 return True
             return False
-        return ", ".join(class_names)
+        return ", ".join(class_names).capitalize()
 
 def give_class(class_name, target_user):
     UserID = get_user_id(target_user)
@@ -169,6 +169,37 @@ def has_class(target_user):
     except (FileNotFoundError, json.JSONDecodeError):
         return None
     
+def get_player_info(target_user):
+    """Get all player information including level, money, class, etc."""
+    UserID = get_user_id(target_user)
+    try:
+        with open('players.json', 'r') as f:
+            players = json.load(f)
+        user_data = players.get(str(UserID))
+        if user_data:
+            return {
+                'class': user_data.get('class', 'No Class'),
+                'level': user_data.get('level', 0),
+                'money': user_data.get('money', 0),
+                'start_time': user_data.get('Start', None)
+            }
+        return None
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+def get_level(target_user):
+    """Get player's current level."""
+    UserID = get_user_id(target_user)
+    try:
+        with open('players.json', 'r') as f:
+            players = json.load(f)
+        user_data = players.get(str(UserID))
+        if user_data and "level" in user_data:
+            return user_data["level"]
+        return None
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
 def make_quests(level):
     Heathpoints = random.randint(10,100)
     #TODO: ADD MORE WEAPONS
@@ -205,7 +236,7 @@ def main():
             # Questing
             elif lower == '!start':
                 available_classes = get_classes()
-                resp = f"PRIVMSG {channel} :@{user} Please choice one of the following classes: {available_classes}. Then use the command '!class <choice>'\r\n"
+                resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>'\r\n"
                 sock.send(resp.encode())
             # TODO: make this work
             elif lower == '!quest':
@@ -324,6 +355,24 @@ def main():
                     resp = f"PRIVMSG {channel} :This channel has {count} followers!\r\n"
                 else:
                     resp = f"PRIVMSG {channel} :Sorry, couldn't fetch follower count.\r\n"
+                sock.send(resp.encode())
+
+            elif lower == '!info':
+                player_info = get_player_info(user)
+                if player_info:
+                    playtime = time.time() - player_info['start_time'] if player_info['start_time'] else 0
+                    playtime_hours = round(playtime / 3600, 1)
+                    resp = f"PRIVMSG {channel} :@{user} Class: {player_info['class']} | Level: {player_info['level']} | Money: {player_info['money']} gold | Playtime: {playtime_hours}h\r\n"
+                else:
+                    resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
+                sock.send(resp.encode())
+
+            elif lower == '!level':
+                level = get_level(user)
+                if level:
+                    resp = f"PRIVMSG {channel} :@{user} You are level {level}!\r\n"
+                else:
+                    resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
                 sock.send(resp.encode())
 
             elif lower.startswith('!'):
