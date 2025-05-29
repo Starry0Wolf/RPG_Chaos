@@ -169,7 +169,7 @@ def has_class(target_user):
     except (FileNotFoundError, json.JSONDecodeError):
         return None
     
-def get_player_info(target_user):
+def get_player_info(target_user, lookingFor = None):
     """Get all player information including level, money, class, etc."""
     UserID = get_user_id(target_user)
     try:
@@ -177,12 +177,17 @@ def get_player_info(target_user):
             players = json.load(f)
         user_data = players.get(str(UserID))
         if user_data:
-            return {
+            userInfo = {
                 'class': user_data.get('class', 'No Class'),
                 'level': user_data.get('level', 0),
                 'money': user_data.get('money', 0),
                 'start_time': user_data.get('Start', None)
             }
+            if lookingFor == None:
+                return userInfo
+            else:
+                print(userInfo[lookingFor])
+                return userInfo[lookingFor]
         return None
     except (FileNotFoundError, json.JSONDecodeError):
         return None
@@ -254,7 +259,7 @@ def main():
                 available_classes = get_classes()
                 resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>'\r\n"
                 sock.send(resp.encode())
-            # TODO: make this work
+
             elif lower == '!quest':
                 if get_player_info(user) == None:
                     available_classes = get_classes()
@@ -278,7 +283,13 @@ def main():
             #     sock.send(resp.encode())
 
             # class
-            elif lower.startswith(('!class')):
+            elif lower.startswith('!attack'):
+                parts = msg.split()
+                if len(parts) > 1:
+                    selectedWeapon = parts[1]
+
+
+            elif lower.startswith('!class'):
                 parts = msg.split()
                 if len(parts) > 1:
                     selected_class = parts[1]
