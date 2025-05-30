@@ -140,35 +140,36 @@ def get_classes(name_class=None):
 
 def give_class(class_name, target_user):
     UserID = get_user_id(target_user)
+    # Get starting weapon for the class
+    starting_weapon = None
+    with open("classes.json", "r") as f:
+        data = json.load(f)
+        for class_data in data:
+            if class_data.get('Class', '').lower() == class_name.lower():
+                starting_weapon = class_data.get('Weapons', 'fists')
+                break
+
     with open('players.json', 'a') as f:
-        # Load existing data
         try:
             with open('players.json', 'r') as fr:
                 players = json.load(fr)
         except (FileNotFoundError, json.JSONDecodeError):
             players = {}
 
-        # Update or add the user's class
-        players[str(UserID)] = {"class": class_name, "level": 1, "money": 250, "Start": time.time}
+        # Update the player data with the starting weapon
+        players[str(UserID)] = {
+            "class": class_name, 
+            "level": 1, 
+            "money": 250, 
+            "weapon": starting_weapon,  # Use the weapon from classes.json
+            "start": time.time()
+        }
 
-        # Write back to file
         with open('players.json', 'w') as fw:
             json.dump(players, fw, indent=2)
         
         return True
 
-# def has_class(target_user):
-#     UserID = get_user_id(target_user)
-#     try:
-#         with open('players.json', 'r') as f:
-#             players = json.load(f)
-#         user_data = players.get(str(UserID))
-#         if user_data and "class" in user_data:
-#             return user_data["class"]
-#         return None
-#     except (FileNotFoundError, json.JSONDecodeError):
-#         return None
-    
 def get_player_info(target_user, lookingFor = None):
     """Get all player information including level, money, class, etc."""
     UserID = get_user_id(target_user)
@@ -181,6 +182,7 @@ def get_player_info(target_user, lookingFor = None):
                 'class': user_data.get('class', 'No Class'),
                 'level': user_data.get('level', 0),
                 'money': user_data.get('money', 0),
+                'weapons': user_data.get('weapon', 0 ),
                 'start_time': user_data.get('Start', None)
             }
             if lookingFor == None:
@@ -285,8 +287,11 @@ def main():
             # class
             elif lower.startswith('!attack'):
                 parts = msg.split()
+                defaultWeapon = get_player_info(target_user=user, lookingFor='weapon'[0])
                 if len(parts) > 1:
                     selectedWeapon = parts[1]
+                else:
+                    selectedWeapon = defaultWeapon
 
 
             elif lower.startswith('!class'):
