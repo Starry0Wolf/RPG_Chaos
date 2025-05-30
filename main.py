@@ -230,6 +230,23 @@ def make_quests(level):
     }
     return Stats
 
+def purchase_item(user, item_name, cost):
+
+def get_items():
+    """Get all items available for purchase in the shop."""
+    with open('shop_items.json', 'r') as f:
+        items = json.load(f)
+    return items
+
+def start_shop():
+    # This creates the stuff you can buy in the shop.
+    available_items = get_items()
+    for i in range(4):
+        item = available_items[random.randint(0, len(available_items) - 1)]
+        cost = 
+
+def get_item_info(item_name):
+
 def main():
     sock = connect()
     while True:
