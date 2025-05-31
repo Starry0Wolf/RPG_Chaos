@@ -433,14 +433,34 @@ def main():
 
             elif lower == '!help':
                 commands = get_available_commands()
-                # Split commands into groups of 4 to avoid message length limits
-                command_list = list(commands.items())
-                for i in range(0, len(command_list), 4):
-                    chunk = command_list[i:i+4]
-                    help_text = ' | '.join([f"{cmd}: {desc}" for cmd, desc in chunk])
-                    resp = f"PRIVMSG {channel} :@{user} {help_text}\r\n"
+                command_strings = [f"{cmd}: {desc}" for cmd, desc in commands.items()]
+                
+                # Calculate chunks based on complete command strings
+                chunks = []
+                current_chunk = []
+                current_length = 0
+                
+                for cmd_str in command_strings:
+                    # +3 accounts for " | " separator
+                    if current_length + len(cmd_str) + 3 > 450:
+                        chunks.append(' | '.join(current_chunk))
+                        current_chunk = [cmd_str]
+                        current_length = len(cmd_str)
+                    else:
+                        current_chunk.append(cmd_str)
+                        current_length += len(cmd_str) + 3
+                
+                if current_chunk:
+                    chunks.append(' | '.join(current_chunk))
+                
+                # Send chunks
+                resp = f"PRIVMSG {channel} :@{user} {chunks[0]}\r\n"
+                sock.send(resp.encode())
+                
+                for chunk in chunks[1:]:
+                    time.sleep(0.5)  # Prevent flooding
+                    resp = f"PRIVMSG {channel} :Continuation: {chunk}\r\n" 
                     sock.send(resp.encode())
-                    time.sleep(0.5)  # Small delay between messages to prevent flooding
 
             elif lower.startswith('!'):
                 resp = f"PRIVMSG {channel} :@{user} Unknown command: {msg}\r\n"
