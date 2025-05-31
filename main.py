@@ -298,6 +298,12 @@ def main():
                 resp = f"PRIVMSG {channel} :@{user} You have lost the game! . . . . . . . . . . . . . . .\r Never gonna give you up, never gonna let you down, never gonna spin you 'round. \r\n"
                 sock.send(resp.encode())
             
+            elif lower == '!raid':
+                resp = f"PRIVMSG {channel} :STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 \r\n"
+                resp2 = f"PRIMSG {channel} :^^ LET'S RAID! GO SPAM THE CHAT WITH CATS! 🐈‍⬛ 🐈 🐅! ^^ \r\n"
+                sock.send(resp.encode())
+                sock.send(resp2.encode())
+
             elif lower == '!intro':
                 resp = f"PRIVMSG {channel} :@{user} Hello! I'm a simple RPG bot made by @Starry0Wolf! Inspired by the @ada_rpg bot, I aim to provide a bit more than Ada. Ada's code organization is a mess, and is coded in the insane language of JavaScript! The reason I was created was that @ribbons_ would not add a cat class, but she said I could make my own bot, so I did, you can check out the coding streams on @Starry0Wolf's channel.\r\n"
                 sock.send(resp.encode())
