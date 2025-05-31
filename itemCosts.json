@@ -1,0 +1,41 @@
+{
+    "Heath Potion (Level 1)": {
+        "Cost": 50
+    },
+
+    "Heath Potion (Level 2)": {
+        "Cost": 100
+    },
+
+    "Heath Potion (Level 3)": {
+        "Cost": 200
+    },
+
+    "Scroll of Fireball": {
+        "Cost": 150
+    },
+
+    "Wine": {
+        "Cost": 25
+    },
+
+    "Maiden": {
+        "Cost": 500
+    },
+
+    "Scroll of Lightning": {
+        "Cost": 175
+    },
+
+    "Ring of Fire Resistance": {
+        "Cost": 450
+    },
+
+    "Rations": {
+        "Cost": 10
+    },
+
+    "100 feet of Rope": {
+        "Cost": 30
+    }
+}
