@@ -230,6 +230,24 @@ def make_quests(level):
     }
     return Stats
 
+def get_available_commands():
+    """Parse the code to extract command descriptions."""
+    commands = {
+        '!chaos': 'Lose the game and get rickrolled',
+        '!intro': 'Get information about this bot',
+        '!start': 'Start your adventure and choose a class',
+        '!quest': 'Go on an adventure (requires a class)',
+        '!class <choice>': 'Choose your character class',
+        '!attack [weapon]': 'Attack with specified weapon or default weapon',
+        '!info': 'View your character stats and playtime',
+        '!level': 'Check your current level',
+        '!followers': 'See how many followers the channel has',
+        '!so <username>': 'Give a shoutout to another streamer',
+        '!remindme <time> [message]': 'Set a reminder (e.g. 3m or 2h)',
+        '!help': 'Show this help message'
+    }
+    return commands
+
 def main():
     sock = connect()
     while True:
@@ -255,7 +273,7 @@ def main():
             elif lower == '!intro':
                 resp = f"PRIVMSG {channel} :@{user} Hello! I'm a simple RPG bot made by @Starry0Wolf! Inspired by the @ada_rpg bot, I aim to provide a bit more than Ada. Ada's code organization is a mess, and is coded in the insane language of JavaScript! The reason I was created was that @ribbons_ would not add a cat class, but she said I could make my own bot, so I did, you can check out the coding streams on @Starry0Wolf's channel.\r\n"
                 sock.send(resp.encode())
-
+        
             # Questing
             elif lower == '!start':
                 available_classes = get_classes()
@@ -412,6 +430,17 @@ def main():
                 else:
                     resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
                 sock.send(resp.encode())
+
+            elif lower == '!help':
+                commands = get_available_commands()
+                # Split commands into groups of 4 to avoid message length limits
+                command_list = list(commands.items())
+                for i in range(0, len(command_list), 4):
+                    chunk = command_list[i:i+4]
+                    help_text = ' | '.join([f"{cmd}: {desc}" for cmd, desc in chunk])
+                    resp = f"PRIVMSG {channel} :@{user} {help_text}\r\n"
+                    sock.send(resp.encode())
+                    time.sleep(0.5)  # Small delay between messages to prevent flooding
 
             elif lower.startswith('!'):
                 resp = f"PRIVMSG {channel} :@{user} Unknown command: {msg}\r\n"
