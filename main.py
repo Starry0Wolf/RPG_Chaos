@@ -231,21 +231,50 @@ def make_quests(level):
     return Stats
 
 def purchase_item(user, item_name, cost):
+    """Purchase an item for the user if they have enough money."""
+    player_info = get_player_info(user)
+    if not player_info:
+        return f"PRIVMSG {CHANNELS[0]} :@{user} You need to start your adventure first! Use !start.\r\n"
+
+    if player_info['money'] < cost:
+        return f"PRIVMSG {CHANNELS[0]} :@{user} You don't have enough money to buy {item_name}!\r\n"
+
+    # Deduct cost and update player info
+    player_info['money'] -= cost
+    with open('players.json', 'w') as f:
+        json.dump({str(get_user_id(user)): player_info}, f, indent=2)
+
+    return f"PRIVMSG {CHANNELS[0]} :@{user} You have purchased {item_name} for {cost} gold!\r\n"
 
 def get_items():
-    """Get all items available for purchase in the shop."""
-    with open('shop_items.json', 'r') as f:
-        items = json.load(f)
-    return items
+    """Get all items available for purchase in the shop with their prices."""
+    # Read available items
+    # with open('shop_items.json', 'r') as f:
+    #     items = json.load(f)
+
+    # Read item costs
+    with open('itemCosts.json', 'r') as f:
+        costs = json.load(f)
+        items = [item for item in costs.keys()]
+
+    # Combine items with their costs
+    items_with_costs = {}
+    for item_name in items:
+        if item_name in costs:
+            items_with_costs[item_name] = {
+                "details": items[item_name],
+                "cost": costs[item_name]["Cost"]
+            }
+
+    return items_with_costs
 
 def start_shop():
     # This creates the stuff you can buy in the shop.
     available_items = get_items()
     for i in range(4):
-        item = available_items[random.randint(0, len(available_items) - 1)]
-        cost = 
+        items,cost = get_items()
 
-def get_item_info(item_name):
+# def get_item_info(item_name):
 
 def main():
     sock = connect()
