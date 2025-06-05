@@ -149,26 +149,30 @@ def give_class(class_name, target_user):
                 starting_weapon = class_data.get('Weapons', 'fists')
                 break
 
-    with open('players.json', 'a') as f:
-        try:
-            with open('players.json', 'r') as fr:
-                players = json.load(fr)
-        except (FileNotFoundError, json.JSONDecodeError):
-            players = {}
+    try:
+        with open('players.json', 'r') as fr:
+            players = json.load(fr)
+    except (FileNotFoundError, json.JSONDecodeError):
+        players = {}
 
-        # Update the player data with the starting weapon
-        players[str(UserID)] = {
-            "class": class_name, 
-            "level": 1, 
-            "money": 250, 
-            "weapon": starting_weapon,  # Use the weapon from classes.json
-            "start": time.time()
-        }
+    # Preserve existing player data if any
+    player_data = players.get(str(UserID), {})
+    # Update only the class-specific fields
+    class_data = {
+        "class": class_name,
+        "level": 1,
+        "money": 250,
+        "weapon": starting_weapon,
+        "start": time.time()
+    }
+    # Merge the data, keeping existing fields intact
+    player_data.update(class_data)
+    players[str(UserID)] = player_data
 
-        with open('players.json', 'w') as fw:
-            json.dump(players, fw, indent=2)
-        
-        return True
+    with open('players.json', 'w') as fw:
+        json.dump(players, fw, indent=2)
+    
+    return True
 
 def get_player_info(target_user, lookingFor = None):
     """Get all player information including level, money, class, etc."""
@@ -276,6 +280,8 @@ def start_shop():
 
 # def get_item_info(item_name):
 
+tasksHuman = []
+
 def main():
     sock = connect()
     while True:
@@ -298,6 +304,41 @@ def main():
                 resp = f"PRIVMSG {channel} :@{user} You have lost the game! . . . . . . . . . . . . . . .\r Never gonna give you up, never gonna let you down, never gonna spin you 'round. \r\n"
                 sock.send(resp.encode())
             
+            elif lower == '!done':
+                userID = get_user_id(user)
+                task = None
+                for t in tasksHuman[:]:  # Use slice to iterate over copy while modifying original
+                    if t.startswith(f"{userID}:"):
+                        task = t.split(":", 1)[1].strip(" '")  # Extract task text
+                        tasksHuman.remove(t)
+                        break
+                if not task:
+                    resp = f"PRIVMSG {channel} :@{user} You have no tasks to complete! Use !task to create one! Like '!task Take a nap'\r\n"
+                    sock.send(resp.encode())
+                    continue
+                resp = f"PRIVMSG {channel} :@{user} Good job finishing {task}! Here is a reward 🍪.\r\n"
+                # First send the message
+                sock.send(resp.encode())
+                
+                # Update tasks completed count in players.json
+                try:
+                    with open('players.json', 'r') as f:
+                        players = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    players = {}
+
+                userID = str(get_user_id(user))
+                if userID in players:
+                    # Add or increment tasks_completed
+                    players[userID]['tasks_completed'] = players[userID].get('tasks_completed', 0) + 1
+                else:
+                    # Create minimal entry just for tasks if user hasn't started game
+                    players[userID] = {'tasks_completed': 1}
+
+                with open('players.json', 'w') as f:
+                    json.dump(players, f, indent=2)
+
+
             elif lower == '!lurk':
                 resp = f"PRIVMSG {channel} :@{user} is lurking! Thanks for the lurk! \r\n"
                 sock.send(resp.encode())
@@ -341,6 +382,24 @@ def main():
             #     sock.send(resp.encode())
 
             # class
+
+            elif lower.startswith('!task'):
+                parts = msg.split()
+                if len(parts) > 1:
+                    userID = get_user_id(user)
+                    task = " ".join(parts[1:])  # Get everything after !task
+                    existing_tasks = [t.split(':', 1)[1].strip(" '") for t in tasksHuman if t.startswith(f"{userID}:")]
+                    print(existing_tasks)
+                    
+                    if existing_tasks:
+                        resp = f"PRIVMSG {channel} :@{user} You should finish {existing_tasks[0]} first!\r\n"
+                    else:
+                        task_entry = f"{userID}: '{task}'"
+                        tasksHuman.append(task_entry)
+                        resp = f"PRIVMSG {channel} :@{user} Task added: {task}\r\n"
+                    sock.send(resp.encode())
+
+
             elif lower.startswith('!attack'):
                 parts = msg.split()
                 defaultWeapon = get_player_info(target_user=user, lookingFor='weapon'[0])
@@ -366,7 +425,7 @@ def main():
                         sock.send(resp.encode())
 
 
-            elif lower.startswith(('!cwa')):
+            elif lower.startswith('!cwa'):
                 parts = msg.split()
                 if len(parts) > 1:
                     message = parts[1]
@@ -378,7 +437,7 @@ def main():
                 else:
                     resp = f"PRIVMSG {channel} :Usage: !cwa <message>\r\n"
 
-            elif lower.startswith(('!remindme', '!remind', '!cr')):
+            elif lower.startswith('!remind'):
                 parts = msg.split()
                 if len(parts) > 2:
                     # Expecting: !chaos remind 3m [optional message...]
