@@ -7,6 +7,7 @@ import threading
 import time
 import json
 import random
+import ssl
 # TODO: FIX ALIASES
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
@@ -18,8 +19,10 @@ CHANNELS = ['#starry0wolf']  # Renamed for clarity
 def connect():
     """Connect to Twitch IRC with an auto-refreshed token."""
     token = get_valid_token()
+    context = ssl.create_default_context()
     sock = socket.socket()
-    sock.connect((HOST, PORT))
+    ssl_sock = context.wrap_socket(sock, server_hostname=HOST)
+    ssl_sock.connect((HOST, PORT))
     sock.send(f"PASS oauth:{token}\r\n".encode())
     sock.send(f"NICK {NICK}\r\n".encode())
     # Join each channel individually
@@ -198,19 +201,6 @@ def get_player_info(target_user, lookingFor = None):
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
-# def get_level(target_user):
-#     """Get player's current level."""
-#     UserID = get_user_id(target_user)
-#     try:
-#         with open('players.json', 'r') as f:
-#             players = json.load(f)
-#         user_data = players.get(str(UserID))
-#         if user_data and "level" in user_data:
-#             return user_data["level"]
-#         return None
-#     except (FileNotFoundError, json.JSONDecodeError):
-        return None
-
 def make_quests(level):
     Heathpoints = random.randint(10,100)
     #TODO: ADD MORE WEAPONS
@@ -290,247 +280,249 @@ def main():
             sock.send("PONG :tmi.twitch.tv\r\n".encode())
             continue
 
-        if 'PRIVMSG' in data:
-            # Extract channel from message
-            channel = data.split('PRIVMSG')[1].split(':', 1)[0].strip().split(' ')[0]
-            user = data.split('!', 1)[0][1:]
-            msg  = data.split('PRIVMSG', 1)[1].split(':', 1)[1].strip()
-            print(f"{user}@{channel}: {msg}")
+        if 'PRIVMSG' not in data:
+            continue
 
-            lower = msg.lower()
+        # Extract channel from message
+        channel = data.split('PRIVMSG')[1].split(':', 1)[0].strip().split(' ')[0]
+        user = data.split('!', 1)[0][1:]
+        msg  = data.split('PRIVMSG', 1)[1].split(':', 1)[1].strip()
+        print(f"{user}@{channel}: {msg}")
 
-            # 1) Exact chat commands
-            if lower == '!chaos':
-                resp = f"PRIVMSG {channel} :@{user} You have lost the game! . . . . . . . . . . . . . . .\r Never gonna give you up, never gonna let you down, never gonna spin you 'round. \r\n"
+        lower = msg.lower()
+
+        # 1 Exact chat commands
+        if lower == '!chaos':
+            resp = f"PRIVMSG {channel} :@{user} You have lost the game! . . . . . . . . . . . . . . .\r Never gonna give you up, never gonna let you down, never gonna spin you 'round. \r\n"
+            sock.send(resp.encode())
+        
+        elif lower == '!done':
+            userID = get_user_id(user)
+            task = None
+            for t in tasksHuman[:]:  # Use slice to iterate over copy while modifying original
+                if t.startswith(f"{userID}:"):
+                    task = t.split(":", 1)[1].strip(" '")  # Extract task text
+                    tasksHuman.remove(t)
+                    break
+            if not task:
+                resp = f"PRIVMSG {channel} :@{user} You have no tasks to complete! Use !task to create one! Like '!task Take a nap'\r\n"
                 sock.send(resp.encode())
+                continue
+            resp = f"PRIVMSG {channel} :@{user} Good job finishing {task}! Here is a reward 🍪.\r\n"
+            # First send the message
+            sock.send(resp.encode())
             
-            elif lower == '!done':
-                userID = get_user_id(user)
-                task = None
-                for t in tasksHuman[:]:  # Use slice to iterate over copy while modifying original
-                    if t.startswith(f"{userID}:"):
-                        task = t.split(":", 1)[1].strip(" '")  # Extract task text
-                        tasksHuman.remove(t)
-                        break
-                if not task:
-                    resp = f"PRIVMSG {channel} :@{user} You have no tasks to complete! Use !task to create one! Like '!task Take a nap'\r\n"
-                    sock.send(resp.encode())
-                    continue
-                resp = f"PRIVMSG {channel} :@{user} Good job finishing {task}! Here is a reward 🍪.\r\n"
-                # First send the message
-                sock.send(resp.encode())
-                
-                # Update tasks completed count in players.json
-                try:
-                    with open('players.json', 'r') as f:
-                        players = json.load(f)
-                except (FileNotFoundError, json.JSONDecodeError):
-                    players = {}
+            # Update tasks completed count in players.json
+            try:
+                with open('players.json', 'r') as f:
+                    players = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                players = {}
 
-                userID = str(get_user_id(user))
-                if userID in players:
-                    # Add or increment tasks_completed
-                    players[userID]['tasks_completed'] = players[userID].get('tasks_completed', 0) + 1
-                else:
-                    # Create minimal entry just for tasks if user hasn't started game
-                    players[userID] = {'tasks_completed': 1}
+            userID = str(get_user_id(user))
+            if userID in players:
+                # Add or increment tasks_completed
+                players[userID]['tasks_completed'] = players[userID].get('tasks_completed', 0) + 1
+            else:
+                # Create minimal entry just for tasks if user hasn't started game
+                players[userID] = {'tasks_completed': 1}
 
-                with open('players.json', 'w') as f:
-                    json.dump(players, f, indent=2)
+            with open('players.json', 'w') as f:
+                json.dump(players, f, indent=2)
 
 
-            elif lower == '!lurk':
-                resp = f"PRIVMSG {channel} :@{user} is lurking! Thanks for the lurk! \r\n"
-                sock.send(resp.encode())
+        elif lower == '!lurk':
+            resp = f"PRIVMSG {channel} :@{user} is lurking! Thanks for the lurk! \r\n"
+            sock.send(resp.encode())
 
-            elif lower == '!raid':
-                resp = f"PRIVMSG {channel} :STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 \r\n"
-                resp2 = f"PRIMSG {channel} :^^ LET'S RAID! GO SPAM THE CHAT WITH CATS! 🐈‍⬛ 🐈 🐅! ^^ \r\n"
-                sock.send(resp.encode())
-                sock.send(resp2.encode())
+        elif lower == '!raid':
+            resp = f"PRIVMSG {channel} :STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 STARRY0WOLF RAID! 🐈‍⬛ 🐈 🐅 \r\n"
+            resp2 = f"PRIMSG {channel} :^^ LET'S RAID! GO SPAM THE CHAT WITH CATS! 🐈‍⬛ 🐈 🐅! ^^ \r\n"
+            sock.send(resp.encode())
+            sock.send(resp2.encode())
 
-            elif lower == '!intro':
-                resp = f"PRIVMSG {channel} :@{user} Hello! I'm a simple RPG bot made by @Starry0Wolf! Inspired by the @ada_rpg bot, I aim to provide a bit more than Ada. Ada's code organization is a mess, and is coded in the insane language of JavaScript! The reason I was created was that @ribbons_ would not add a cat class, but she said I could make my own bot, so I did, you can check out the coding streams on @Starry0Wolf's channel.\r\n"
-                sock.send(resp.encode())
+        elif lower == '!intro':
+            resp = f"PRIVMSG {channel} :@{user} Hello! I'm a simple RPG bot made by @Starry0Wolf! Inspired by the @ada_rpg bot, I aim to provide a bit more than Ada. Ada's code organization is a mess, and is coded in the insane language of JavaScript! The reason I was created was that @ribbons_ would not add a cat class, but she said I could make my own bot, so I did, you can check out the coding streams on @Starry0Wolf's channel.\r\n"
+            sock.send(resp.encode())
 
-            # Questing
-            elif lower == '!start':
+        # Questing
+        elif lower == '!start':
+            available_classes = get_classes()
+            resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>'\r\n"
+            sock.send(resp.encode())
+
+        elif lower == '!quest':
+            if get_player_info(user) == None:
                 available_classes = get_classes()
-                resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>'\r\n"
+                resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>. After that you can rerun this command to do the quest!'\r\n"
+                sock.send(resp.encode())
+            else:
+                currentLevel = get_player_info(target_user=user, lookingFor='class')
+                StartingBossStats = make_quests(level=currentLevel)
+                print(StartingBossStats)
+                print()
+                resp = f"PRIVMSG {channel} :@{user} Your quest: Slay the dragon!\r\n"
                 sock.send(resp.encode())
 
-            elif lower == '!quest':
-                if get_player_info(user) == None:
-                    available_classes = get_classes()
-                    resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>. After that you can rerun this command to do the quest!'\r\n"
-                    sock.send(resp.encode())
+        # 2) Pattern match: startswith 'bex' AND contains 'reeere'
+        # elif lower.startswith('!chaos') and 'remind' in lower:
+        #     parts = msg.split()
+        #     if len(parts) > 1:
+        #         minutes = parts[3]
+        #     # resp = f"PRIVMSG {CHANNEL} :@{user} you were supposed to be doing something! It has been {minutes}!\r\n"
+        #     print(resp)
+        #     sock.send(resp.encode())
+
+        # class
+
+        elif lower.startswith('!task'):
+            parts = msg.split()
+            if len(parts) > 1:
+                userID = get_user_id(user)
+                task = " ".join(parts[1:])  # Get everything after !task
+                existing_tasks = [t.split(':', 1)[1].strip(" '") for t in tasksHuman if t.startswith(f"{userID}:")]
+                print(existing_tasks)
+                
+                if existing_tasks:
+                    resp = f"PRIVMSG {channel} :@{user} You should finish {existing_tasks[0]} first!\r\n"
                 else:
-                    currentLevel = get_player_info(target_user=user, lookingFor='class')
-                    StartingBossStats = make_quests(level=currentLevel)
-                    print(StartingBossStats)
-                    print()
-                    resp = f"PRIVMSG {channel} :@{user} Your quest: Slay the dragon!\r\n"
-                    sock.send(resp.encode())
+                    task_entry = f"{userID}: '{task}'"
+                    tasksHuman.append(task_entry)
+                    resp = f"PRIVMSG {channel} :@{user} Task added: {task}\r\n"
+                sock.send(resp.encode())
 
-            # 2) Pattern match: startswith 'bex' AND contains 'reeere'
-            # elif lower.startswith('!chaos') and 'remind' in lower:
-            #     parts = msg.split()
-            #     if len(parts) > 1:
-            #         minutes = parts[3]
-            #     # resp = f"PRIVMSG {CHANNEL} :@{user} you were supposed to be doing something! It has been {minutes}!\r\n"
-            #     print(resp)
-            #     sock.send(resp.encode())
 
-            # class
+        elif lower.startswith('!attack'):
+            parts = msg.split()
+            defaultWeapon = get_player_info(target_user=user, lookingFor='weapon'[0])
+            if len(parts) > 1:
+                selectedWeapon = parts[1]
+            else:
+                selectedWeapon = defaultWeapon
 
-            elif lower.startswith('!task'):
-                parts = msg.split()
-                if len(parts) > 1:
-                    userID = get_user_id(user)
-                    task = " ".join(parts[1:])  # Get everything after !task
-                    existing_tasks = [t.split(':', 1)[1].strip(" '") for t in tasksHuman if t.startswith(f"{userID}:")]
-                    print(existing_tasks)
-                    
-                    if existing_tasks:
-                        resp = f"PRIVMSG {channel} :@{user} You should finish {existing_tasks[0]} first!\r\n"
-                    else:
-                        task_entry = f"{userID}: '{task}'"
-                        tasksHuman.append(task_entry)
-                        resp = f"PRIVMSG {channel} :@{user} Task added: {task}\r\n"
+
+        elif lower.startswith('!class'):
+            parts = msg.split()
+            if len(parts) > 1:
+                selected_class = parts[1]
+                isClass = get_classes(selected_class)
+                hasClass = get_player_info(target_user=user, lookingFor='class')  # <-- FIXED: pass user, not selected_class
+                print(hasClass)
+                # if hasClass is not None:
+                #     resp = f"PRIVMSG {channel} :@{user} Sorry! You already have a class, currently I have not added class switching! DM me to remind me to add it!\r\n"
+                #     sock.send(resp.encode())
+                if isClass == True:
+                    give_class(class_name=selected_class, target_user=user)
+                    resp = f"PRIVMSG {channel} :@{user} You have been given a class!\r\n"
                     sock.send(resp.encode())
 
 
-            elif lower.startswith('!attack'):
-                parts = msg.split()
-                defaultWeapon = get_player_info(target_user=user, lookingFor='weapon'[0])
-                if len(parts) > 1:
-                    selectedWeapon = parts[1]
-                else:
-                    selectedWeapon = defaultWeapon
+        elif lower.startswith('!cwa'):
+            parts = msg.split()
+            if len(parts) > 1:
+                message = parts[1]
+                # resp = f"PRIVMSG {channel} :Channel wide announcement sent!\r\n"
+                # sock.send(resp.encode())
+                for channel in CHANNELS:
+                    resp2 = f"PRIVMSG {channel} :{message}\r\n"
+                    sock.send(resp2.encode())
+            else:
+                resp = f"PRIVMSG {channel} :Usage: !cwa <message>\r\n"
 
+        elif lower.startswith('!remind'):
+            parts = msg.split()
+            if len(parts) > 2:
+                # Expecting: !chaos remind 3m [optional message...]
+                time_str = parts[2].lower()
+                reminder_msg = " ".join(parts[3:]).strip() if len(parts) > 3 else None
 
-            elif lower.startswith('!class'):
-                parts = msg.split()
-                if len(parts) > 1:
-                    selected_class = parts[1]
-                    isClass = get_classes(selected_class)
-                    hasClass = get_player_info(target_user=user, lookingFor='class')  # <-- FIXED: pass user, not selected_class
-                    print(hasClass)
-                    # if hasClass is not None:
-                    #     resp = f"PRIVMSG {channel} :@{user} Sorry! You already have a class, currently I have not added class switching! DM me to remind me to add it!\r\n"
-                    #     sock.send(resp.encode())
-                    if isClass == True:
-                        give_class(class_name=selected_class, target_user=user)
-                        resp = f"PRIVMSG {channel} :@{user} You have been given a class!\r\n"
-                        sock.send(resp.encode())
+                multiplier = None
+                amount = None
+                if time_str.endswith('m'):
+                    multiplier = 60
+                    try:
+                        amount = int(time_str[:-1])
+                    except ValueError:
+                        amount = None
+                elif time_str.endswith('h'):
+                    multiplier = 3600
+                    try:
+                        amount = int(time_str[:-1])
+                    except ValueError:
+                        amount = None
 
-
-            elif lower.startswith('!cwa'):
-                parts = msg.split()
-                if len(parts) > 1:
-                    message = parts[1]
-                    # resp = f"PRIVMSG {channel} :Channel wide announcement sent!\r\n"
-                    # sock.send(resp.encode())
-                    for channel in CHANNELS:
-                        resp2 = f"PRIVMSG {channel} :{message}\r\n"
-                        sock.send(resp2.encode())
-                else:
-                    resp = f"PRIVMSG {channel} :Usage: !cwa <message>\r\n"
-
-            elif lower.startswith('!remind'):
-                parts = msg.split()
-                if len(parts) > 2:
-                    # Expecting: !chaos remind 3m [optional message...]
-                    time_str = parts[2].lower()
-                    reminder_msg = " ".join(parts[3:]).strip() if len(parts) > 3 else None
-
-                    multiplier = None
-                    amount = None
-                    if time_str.endswith('m'):
-                        multiplier = 60
-                        try:
-                            amount = int(time_str[:-1])
-                        except ValueError:
-                            amount = None
-                    elif time_str.endswith('h'):
-                        multiplier = 3600
-                        try:
-                            amount = int(time_str[:-1])
-                        except ValueError:
-                            amount = None
-
-                    if multiplier and amount:
-                        total_seconds = amount * multiplier
-                        def threaded_reminder(user, seconds, sock, reminder_msg):
-                            time.sleep(seconds)
-                            if reminder_msg:
-                                resp = f"PRIVMSG {channel} :@{user} Reminder: {reminder_msg} (after {time_str})\r\n"
-                            else:
-                                resp = f"PRIVMSG {channel} :@{user} You were supposed to be doing something! It has been {time_str}!\r\n"
-                            sock.send(resp.encode())
-                        threading.Thread(target=threaded_reminder, args=(user, total_seconds, sock, reminder_msg), daemon=True).start()
-                        resp = f"PRIVMSG {channel} :@{user} Reminder set for {time_str}{' (' + reminder_msg + ')' if reminder_msg else ' (Did you know by adding a message after the time, you can say what to be reminded about?)'}!\r\n"
-                        sock.send(resp.encode())
-                    else:
-                        resp = f"PRIVMSG {channel} :@{user} Invalid time format. Use like '!chaos remind 3m' or '!chaos remind 2h'\r\n"
-                        sock.send(resp.encode())
-                else:
-                    resp = f"PRIVMSG {channel} :@{user} Usage: !chaos remind 3m [what to remind you about]\r\n"
-                    sock.send(resp.encode())
-            
-            elif lower.startswith('!so'):
-                parts = msg.split()
-                if len(parts) > 1:
-                    target = parts[1].lstrip('@').capitalize()
-                    if not is_affiliate(channel):
-                        resp = f"PRIVMSG {channel} :We can't do this until we are affiliate. But still EVERYONE GO FOLLOW {target}!\r\n"
-                        sock.send(resp.encode())
-                        sock.send(resp.encode())
-                        sock.send(resp.encode())
-                    else:
-                        resp = shoutout(target)
-                        if isinstance(resp, dict) and resp.get('status') == 404:
-                            reply = f"PRIVMSG {channel} :@{user} Couldn't find user @{target} on Twitch.\r\n"
-                        elif hasattr(resp, 'status_code') and resp.status_code == 204:
-                            reply = f"PRIVMSG {channel} :@{user} Shoutout to @{target}!\r\n"
+                if multiplier and amount:
+                    total_seconds = amount * multiplier
+                    def threaded_reminder(user, seconds, sock, reminder_msg):
+                        time.sleep(seconds)
+                        if reminder_msg:
+                            resp = f"PRIVMSG {channel} :@{user} Reminder: {reminder_msg} (after {time_str})\r\n"
                         else:
-                            reply = f"PRIVMSG {channel} :@{user} Failed to shout out @{target}. Status {resp.status_code}\r\n"
-                        sock.send(reply.encode())
-                else:
-                    resp = f"PRIVMSG {channel} :@{user} Usage: !so <username>\r\n"
+                            resp = f"PRIVMSG {channel} :@{user} You were supposed to be doing something! It has been {time_str}!\r\n"
+                        sock.send(resp.encode())
+                    threading.Thread(target=threaded_reminder, args=(user, total_seconds, sock, reminder_msg), daemon=True).start()
+                    resp = f"PRIVMSG {channel} :@{user} Reminder set for {time_str}{' (' + reminder_msg + ')' if reminder_msg else ' (Did you know by adding a message after the time, you can say what to be reminded about?)'}!\r\n"
                     sock.send(resp.encode())
-
-
-            # 4) Other “!” commands or fallback
-            elif lower == '!followers':
-                count = get_follower_count(channel)
-                if count != None:
-                    resp = f"PRIVMSG {channel} :This channel has {count} followers!\r\n"
                 else:
-                    resp = f"PRIVMSG {channel} :Sorry, couldn't fetch follower count.\r\n"
+                    resp = f"PRIVMSG {channel} :@{user} Invalid time format. Use like '!chaos remind 3m' or '!chaos remind 2h'\r\n"
+                    sock.send(resp.encode())
+            else:
+                resp = f"PRIVMSG {channel} :@{user} Usage: !chaos remind 3m [what to remind you about]\r\n"
                 sock.send(resp.encode())
-
-            elif lower == '!info':
-                player_info = get_player_info(user)
-                if player_info:
-                    playtime = time.time() - player_info['start_time'] if player_info['start_time'] else 0
-                    playtime_hours = round(playtime / 3600, 1)
-                    resp = f"PRIVMSG {channel} :@{user} Class: {player_info['class']} | Level: {player_info['level']} | Money: {player_info['money']} gold | Playtime: {playtime_hours}h\r\n"
+        
+        elif lower.startswith('!so'):
+            parts = msg.split()
+            if len(parts) > 1:
+                target = parts[1].lstrip('@').capitalize()
+                if not is_affiliate(channel):
+                    resp = f"PRIVMSG {channel} :We can't do this until we are affiliate. But still EVERYONE GO FOLLOW {target}!\r\n"
+                    sock.send(resp.encode())
+                    sock.send(resp.encode())
+                    sock.send(resp.encode())
                 else:
-                    resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
+                    resp = shoutout(target)
+                    if isinstance(resp, dict) and resp.get('status') == 404:
+                        reply = f"PRIVMSG {channel} :@{user} Couldn't find user @{target} on Twitch.\r\n"
+                    elif hasattr(resp, 'status_code') and resp.status_code == 204:
+                        reply = f"PRIVMSG {channel} :@{user} Shoutout to @{target}!\r\n"
+                    else:
+                        reply = f"PRIVMSG {channel} :@{user} Failed to shout out @{target}. Status {resp.status_code}\r\n"
+                    sock.send(reply.encode())
+            else:
+                resp = f"PRIVMSG {channel} :@{user} Usage: !so <username>\r\n"
                 sock.send(resp.encode())
 
-            elif lower == '!level':
-                level = get_player_info(target_user=user, lookingFor='level')
-                if level:
-                    resp = f"PRIVMSG {channel} :@{user} You are level {level}!\r\n"
-                else:
-                    resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
-                sock.send(resp.encode())
 
-            elif lower.startswith('!'):
-                resp = f"PRIVMSG {channel} :@{user} Unknown command: {msg}\r\n"
-                sock.send(resp.encode())
+        # 4) Other “!” commands or fallback
+        elif lower == '!followers':
+            count = get_follower_count(channel)
+            if count != None:
+                resp = f"PRIVMSG {channel} :This channel has {count} followers!\r\n"
+            else:
+                resp = f"PRIVMSG {channel} :Sorry, couldn't fetch follower count.\r\n"
+            sock.send(resp.encode())
+
+        elif lower == '!info':
+            player_info = get_player_info(user)
+            if player_info:
+                playtime = time.time() - player_info['start_time'] if player_info['start_time'] else 0
+                playtime_hours = round(playtime / 3600, 1)
+                resp = f"PRIVMSG {channel} :@{user} Class: {player_info['class']} | Level: {player_info['level']} | Money: {player_info['money']} gold | Playtime: {playtime_hours}h\r\n"
+            else:
+                resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
+            sock.send(resp.encode())
+
+        elif lower == '!level':
+            level = get_player_info(target_user=user, lookingFor='level')
+            if level:
+                resp = f"PRIVMSG {channel} :@{user} You are level {level}!\r\n"
+            else:
+                resp = f"PRIVMSG {channel} :@{user} You haven't started your adventure yet! Use !start to begin.\r\n"
+            sock.send(resp.encode())
+
+        elif lower.startswith('!'):
+            resp = f"PRIVMSG {channel} :@{user} Unknown command: {msg}\r\n"
+            sock.send(resp.encode())
 
 
 if __name__ == "__main__":
