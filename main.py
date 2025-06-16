@@ -209,7 +209,7 @@ def get_player_info(target_user, lookingFor = None):
 #             return user_data["level"]
 #         return None
 #     except (FileNotFoundError, json.JSONDecodeError):
-        return None
+#         return None
 
 def make_quests(level):
     Heathpoints = random.randint(10,100)
