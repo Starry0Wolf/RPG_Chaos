@@ -4,7 +4,7 @@ import time
 from .start import get_user_id, CHANNELS
 
 def get_classes(name_class=None):
-    with open("classes.json", "r") as f:
+    with open("Storage/classes.json", "r") as f:
         data = json.load(f)
         class_names = [item['Class'] for item in data if 'Class' in item]
         if name_class is not None:
@@ -15,7 +15,7 @@ def give_class(class_name, target_user):
     UserID = get_user_id(target_user)
     # Get starting weapon for the class
     starting_weapon = None
-    with open("classes.json", "r") as f:
+    with open("Storage/classes.json", "r") as f:
         data = json.load(f)
         for class_data in data:
             if class_data.get('Class', '').lower() == class_name.lower():
@@ -23,7 +23,7 @@ def give_class(class_name, target_user):
                 break
 
     try:
-        with open('players.json', 'r') as fr:
+        with open('Storage/players.json', 'r') as fr:
             players = json.load(fr)
     except (FileNotFoundError, json.JSONDecodeError):
         players = {}
@@ -51,7 +51,7 @@ def get_player_info(target_user, lookingFor=None):
     """Get all player information including level, money, class, etc."""
     UserID = get_user_id(target_user)
     try:
-        with open('players.json', 'r') as f:
+        with open('Storage/players.json', 'r') as f:
             players = json.load(f)
             if str(UserID) in players:
                 player_data = players[str(UserID)]
@@ -100,7 +100,7 @@ def purchase_item(user, item_name, cost):
 
     # Deduct cost and update player info
     player_info['money'] -= cost
-    with open('players.json', 'w') as f:
+    with open('Storage/players.json', 'w') as f:
         json.dump({str(get_user_id(user)): player_info}, f, indent=2)
 
     return f"PRIVMSG {CHANNELS[0]} :@{user} You have purchased {item_name} for {cost} gold!\r\n"
@@ -108,7 +108,7 @@ def purchase_item(user, item_name, cost):
 def get_items():
     """Get all items available for purchase in the shop with their prices."""
     try:
-        with open('itemCosts.json', 'r') as f:
+        with open('Storage/itemCosts.json', 'r') as f:
             costs = json.load(f)
             items = [item for item in costs.keys()]
 

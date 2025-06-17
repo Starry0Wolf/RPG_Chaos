@@ -3,7 +3,7 @@ from .start import get_user_id
 
 def update_task_completion(user):
     try:
-        with open('players.json', 'r') as f:
+        with open('Storage/players.json', 'r') as f:
             players = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         players = {}
@@ -14,7 +14,7 @@ def update_task_completion(user):
     else:
         players[userID] = {'tasks_completed': 1}
 
-    with open('players.json', 'w') as f:
+    with open('Storage/players.json', 'w') as f:
         json.dump(players, f, indent=2)
 
 def handle_done(user, channel, sock, tasksHuman):
