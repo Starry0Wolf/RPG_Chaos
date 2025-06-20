@@ -1,7 +1,5 @@
 # Ignore secret environment files
 .env
-tokens.json
-players.json
 
 # Ignore compiled Python files
 __pycache__/
@@ -14,3 +12,11 @@ __pycache__/
 venv/
 .env/
 
+# Ignore the files the bot creats
+Storage/active_quests.json
+Storage/players.json
+Storage/reminders.json
+Storage/reminders.json
+tokens.json
+players.json
+Storage/reminders.json

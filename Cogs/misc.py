@@ -2,44 +2,80 @@ import json
 from .start import get_user_id
 
 def update_task_completion(user):
+    userID = str(get_user_id(user))
     try:
         with open('Storage/players.json', 'r') as f:
             players = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         players = {}
-
-    userID = str(get_user_id(user))
-    if userID in players:
-        players[userID]['tasks_completed'] = players[userID].get('tasks_completed', 0) + 1
-    else:
-        players[userID] = {'tasks_completed': 1}
-
+    if userID not in players:
+        players[userID] = {}
+    players[userID]['tasks_completed'] = players[userID].get('tasks_completed', 0) + 1
     with open('Storage/players.json', 'w') as f:
         json.dump(players, f, indent=2)
 
-def handle_done(user, channel, sock, tasksHuman):
+def handle_done(user, channel, sock, tasksHuman=None, task_number=None):
     userID = str(get_user_id(user))
-    task = None
-    for t in tasksHuman[:]:  # Use slice to iterate over copy while modifying original
-        if t.startswith(f"{userID}:"):
-            task = t.split(":", 1)[1].strip(" '")  # Extract task text
-            tasksHuman.remove(t)
-            break
-    
-    if not task:
+    try:
+        with open('Storage/players.json', 'r') as f:
+            players = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        players = {}
+    user_tasks = players.get(userID, {}).get('tasks', [])
+    if not user_tasks:
         resp = f"PRIVMSG {channel} :@{user} You have no tasks to complete! Use !task to create one! Like '!task Take a nap'\r\n"
         sock.send(resp.encode())
         return
-        
-    resp = f"PRIVMSG {channel} :@{user} Good job finishing {task}! Here is a reward 🍪.\r\n"
-    sock.send(resp.encode())
-    update_task_completion(user)
+    # If only one task, or valid number provided, complete it
+    if len(user_tasks) == 1 or (task_number and task_number.isdigit() and 1 <= int(task_number) <= len(user_tasks)):
+        idx = 0 if len(user_tasks) == 1 else int(task_number) - 1
+        finished_task = user_tasks.pop(idx)
+        players[userID]['tasks'] = user_tasks
+        players[userID]['tasks_completed'] = players[userID].get('tasks_completed', 0) + 1
+        with open('Storage/players.json', 'w') as f:
+            json.dump(players, f, indent=2)
+        resp = f"PRIVMSG {channel} :@{user} Good job finishing {finished_task}! Here is a reward 🍪.\r\n"
+        sock.send(resp.encode())
+    else:
+        # Show numbered list and prompt (single line for Twitch)
+        tasks_list = ' | '.join([f"{i+1}. {task}" for i, task in enumerate(user_tasks)])
+        resp = f"PRIVMSG {channel} :@{user} You have multiple tasks. Please specify which one to complete using !done <number>: {tasks_list}\r\n"
+        sock.send(resp.encode())
 
-def handle_task(user, channel, sock, task):
+def handle_task(user, channel, sock, task, tasksHuman=None):
+    userID = str(get_user_id(user))
     if not task:
         resp = f"PRIVMSG {channel} :@{user} Please specify a task to do!\r\n"
+        sock.send(resp.encode())
+        return
+    try:
+        with open('Storage/players.json', 'r') as f:
+            players = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        players = {}
+    if userID not in players:
+        players[userID] = {}
+    if 'tasks' not in players[userID]:
+        players[userID]['tasks'] = []
+    players[userID]['tasks'].append(task)
+    with open('Storage/players.json', 'w') as f:
+        json.dump(players, f, indent=2)
+    resp = f"PRIVMSG {channel} :@{user} has started the task: {task}\r\n"
+    sock.send(resp.encode())
+
+def handle_list_tasks(user, channel, sock, tasksHuman=None):
+    userID = str(get_user_id(user))
+    try:
+        with open('Storage/players.json', 'r') as f:
+            players = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        players = {}
+    user_tasks = players.get(userID, {}).get('tasks', [])
+    if not user_tasks:
+        resp = f"PRIVMSG {channel} :@{user} You have no current tasks. Use !task to add one!\r\n"
     else:
-        resp = f"PRIVMSG {channel} :@{user} has started the task: {task}\r\n"
+        tasks_list = ' | '.join([f"{i+1}. {task}" for i, task in enumerate(user_tasks)])
+        resp = f"PRIVMSG {channel} :@{user} Your current tasks: {tasks_list}\r\n"
     sock.send(resp.encode())
 
 def handle_chaos(user, channel, sock):

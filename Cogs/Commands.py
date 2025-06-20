@@ -9,7 +9,7 @@ from .Questing import (
     handle_info, handle_class, handle_start,
     handle_attack
 )
-from .misc import handle_intro, handle_done, handle_task, handle_chaos, handle_WIP
+from .misc import handle_intro, handle_done, handle_task, handle_list_tasks, handle_chaos, handle_WIP
 from .config import is_command_enabled, is_feature_enabled
 
 # Command registry with aliases and argument requirements
@@ -25,7 +25,7 @@ COMMANDS = {
     '!so': {'handler': shoutout, 'needs_tasks': False},
     '!shoutout': {'handler': shoutout, 'needs_tasks': False},  # alias
     '!followers': {'handler': handle_followers, 'needs_tasks': False},
-    
+        
     # RPG commands
     '!start': {'handler': handle_start, 'needs_tasks': False},
     '!quest': {'handler': handle_quest, 'needs_tasks': False},
@@ -39,6 +39,7 @@ COMMANDS = {
     # Task commands
     '!task': {'handler': handle_task, 'needs_tasks': False},
     '!todo': {'handler': handle_task, 'needs_tasks': False},  # alias
+    '!tasks': {'handler': handle_list_tasks, 'needs_tasks': False, 'pass_tasks_human': True},
     
     # Reminder commands
     '!remind': {'handler': send_reminder, 'needs_tasks': False},
@@ -50,40 +51,52 @@ COMMANDS = {
 
 def handle_command(user, channel, msg, sock, tasksHuman):
     """Main command handler that routes commands to their specific handlers"""
-    parts = msg.lower().split()
+    parts = msg.strip().split()
     if not parts:
         return
-        
-    cmd = parts[0]
+    cmd = parts[0].lower()
     args = parts[1:] if len(parts) > 1 else []
-    
+
     # Check if command exists and is enabled
     if not cmd in COMMANDS or not is_command_enabled(cmd):
         if cmd.startswith('!'):
             resp = f"PRIVMSG {channel} :@{user} This command is not available.\r\n"
             sock.send(resp.encode())
         return
-        
-    # Get command handler and whether it needs tasksHuman
+
     command = COMMANDS[cmd]
     handler = command['handler']
     needs_tasks = command['needs_tasks']
-    
-    # Special handling for commands that start with a prefix
+    pass_tasks_human = command.get('pass_tasks_human', False)
+
+    # Special handling for !done with optional number
+    if cmd == '!done':
+        # If a number is provided, pass it as task_number
+        task_number = args[0] if args and args[0].isdigit() else None
+        handler(user, channel, sock, tasksHuman, task_number)
+        return
+    # Special handling for !task and !todo
     if cmd in ['!task', '!todo']:
         if not is_feature_enabled('tasks'):
             resp = f"PRIVMSG {channel} :@{user} Tasks are currently disabled.\r\n"
             sock.send(resp.encode())
             return
-        handler(user, channel, sock, ' '.join(args) if args else None)
+        handler(user, channel, sock, ' '.join(args) if args else None, tasksHuman)
+        return
+    # Special handling for !tasks
+    if cmd == '!tasks':
+        handler(user, channel, sock, tasksHuman)
+        return
     elif cmd.startswith('!class'):
         handler(user, channel, sock, args[0] if args else None)
+        return
     elif cmd in ['!so', '!shoutout']:
         if not args:
             resp = f"PRIVMSG {channel} :@{user} Please specify a user to shoutout!\r\n"
             sock.send(resp.encode())
             return
         handler(args[0] if args else None)
+        return
     elif cmd in ['!remind', '!reminder', '!remindme']:
         if not is_feature_enabled('reminders'):
             resp = f"PRIVMSG {channel} :@{user} Reminders are currently disabled.\r\n"
@@ -96,15 +109,22 @@ def handle_command(user, channel, msg, sock, tasksHuman):
         else:
             resp = f"PRIVMSG {channel} :@{user} Please specify a time for the reminder (e.g., 5m or 2h)\r\n"
             sock.send(resp.encode())
+        return
     elif cmd in ['!reminders', '!listreminders']:
         if not is_feature_enabled('reminders'):
             resp = f"PRIVMSG {channel} :@{user} Reminders are currently disabled.\r\n"
             sock.send(resp.encode())
             return
         handler(user, channel, sock)
+        return
     # Handle commands that need tasksHuman
     elif needs_tasks:
         handler(user, channel, sock, tasksHuman)
+        return
+    elif pass_tasks_human:
+        handler(user, channel, sock, tasksHuman)
+        return
     # Handle other commands
     else:
         handler(user, channel, sock)
+        return

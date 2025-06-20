@@ -24,7 +24,7 @@
     "!listreminders": true,
     "!lurk": true,
     "!raid": true,
-    "!followers": true,
+    "!followers": false,
     "!intro": true,
     "!chaos": false
   },
