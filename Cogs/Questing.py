@@ -1,6 +1,7 @@
 import json
 import random
 import time
+import re
 from .start import get_user_id, CHANNELS
 
 def get_classes(name_class=None):
@@ -42,7 +43,7 @@ def give_class(class_name, target_user):
     player_data.update(class_data)
     players[str(UserID)] = player_data
 
-    with open('players.json', 'w') as fw:
+    with open('Storage/players.json', 'w') as fw:
         json.dump(players, fw, indent=2)
     
     return True
@@ -125,16 +126,161 @@ def get_items():
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
+def parse_damage_string(damage_str):
+    """Parse a damage string like "2d6" or "3d4 + 1" into number of dice, sides, and bonus"""
+    pattern = r"(\d+)?d(\d+)(?:\s*\+\s*(\d+))?"
+    match = re.match(pattern, damage_str)
+    if match:
+        num_dice = int(match.group(1)) if match.group(1) else 1
+        sides = int(match.group(2))
+        bonus = int(match.group(3)) if match.group(3) else 0
+        return num_dice, sides, bonus
+    return None
+
+def roll_damage(damage_str):
+    """Roll damage based on weapon damage string (e.g. "2d6" or "3d4 + 1")"""
+    parsed = parse_damage_string(damage_str)
+    if parsed:
+        num_dice, sides, bonus = parsed
+        rolls = [random.randint(1, sides) for _ in range(num_dice)]
+        return sum(rolls) + bonus
+    return 0
+
+def get_active_quest(user_id):
+    """Get active quest for a user"""
+    try:
+        with open('Storage/active_quests.json', 'r') as f:
+            quests = json.load(f)
+            return quests.get(str(user_id))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+def save_active_quest(user_id, quest_data):
+    """Save or update active quest for a user"""
+    try:
+        with open('Storage/active_quests.json', 'r') as f:
+            quests = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        quests = {}
+    
+    quests[str(user_id)] = quest_data
+    
+    with open('Storage/active_quests.json', 'w') as f:
+        json.dump(quests, f, indent=2)
+
+def remove_active_quest(user_id):
+    """Remove a completed/failed quest"""
+    try:
+        with open('Storage/active_quests.json', 'r') as f:
+            quests = json.load(f)
+        if str(user_id) in quests:
+            del quests[str(user_id)]
+            with open('Storage/active_quests.json', 'w') as f:
+                json.dump(quests, f, indent=2)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+def handle_attack(user, channel, sock):
+    player_info = get_player_info(user)
+    if not player_info:
+        resp = f"PRIVMSG {channel} :@{user} You need to start your adventure first! Use !start\r\n"
+        sock.send(resp.encode())
+        return
+
+    user_id = get_user_id(user)
+    quest = get_active_quest(user_id)
+    
+    if not quest:
+        resp = f"PRIVMSG {channel} :@{user} You're not in combat! Use !quest to find a monster to fight\r\n"
+        sock.send(resp.encode())
+        return
+
+    # Get player's weapon damage from their class
+    with open("Storage/classes.json", "r") as f:
+        classes = json.load(f)
+        weapon_damage = None
+        for c in classes:
+            if c['Class'].lower() == player_info['class'].lower():
+                weapon_damage = c['WeaponDamage']
+                break
+    
+    if not weapon_damage:
+        resp = f"PRIVMSG {channel} :@{user} Error: Could not find your class weapon damage\r\n"
+        sock.send(resp.encode())
+        return
+
+    # Calculate player's damage
+    damage = roll_damage(weapon_damage)
+    quest['BaseHeath'] -= damage
+
+    # Update quest state
+    save_active_quest(user_id, quest)
+
+    # Send combat message
+    resp = f"PRIVMSG {channel} :@{user} attacks for {damage} damage! "
+    
+    if quest['BaseHeath'] <= 0:
+        # Quest completed!
+        gold_reward = random.randint(50, 150)  # Random gold reward
+        exp_reward = random.randint(10, 30)   # Random exp reward
+        
+        # Update player stats
+        try:
+            with open('Storage/players.json', 'r') as f:
+                players = json.load(f)
+            
+            player_data = players[str(user_id)]
+            player_data['money'] = player_data.get('money', 0) + gold_reward
+            
+            # Simple leveling system
+            current_level = player_data.get('level', 1)
+            current_exp = player_data.get('exp', 0) + exp_reward
+            exp_needed = current_level * 100  # Simple formula: level * 100 exp needed
+            
+            if current_exp >= exp_needed:
+                player_data['level'] = current_level + 1
+                resp += f"LEVEL UP! You are now level {current_level + 1}! "
+            
+            player_data['exp'] = current_exp
+            players[str(user_id)] = player_data
+            
+            with open('Storage/players.json', 'w') as f:
+                json.dump(players, f, indent=2)
+                
+            resp += f"Victory! The monster is defeated! You gain {gold_reward} gold and {exp_reward} experience!\r\n"
+            remove_active_quest(user_id)
+            
+        except Exception as e:
+            resp += f"Victory! But there was an error saving rewards: {str(e)}\r\n"
+            
+    else:
+        # Monster still alive - it attacks back
+        monster_damage = random.randint(quest['Damage']['BaseDamage'], 
+                                      quest['Damage']['BaseDamage'] + quest['Damage']['AddonDamage'])
+        resp += f"Monster has {quest['BaseHeath']} HP left and strikes back for {monster_damage} damage!\r\n"
+
+    sock.send(resp.encode())
+
 def handle_quest(user, channel, sock):
     if get_player_info(user) is None:
         available_classes = get_classes()
         resp = f"PRIVMSG {channel} :@{user} Please choose one of the following classes: {available_classes}. Then use the command '!class <choice>'. After that you can rerun this command to do the quest!\r\n"
         sock.send(resp.encode())
-    else:
-        currentLevel = get_player_info(target_user=user, lookingFor='level')
-        boss_stats = make_quests(level=currentLevel)
-        resp = f"PRIVMSG {channel} :@{user} You encounter a boss with {boss_stats['BaseHeath']} HP wielding a {boss_stats['Weapon']}! Use !attack to fight!\r\n"
+        return
+
+    user_id = get_user_id(user)
+    current_quest = get_active_quest(user_id)
+    if current_quest:
+        resp = f"PRIVMSG {channel} :@{user} You're already in combat! The monster has {current_quest['BaseHeath']} HP left! Use !attack to fight!\r\n"
         sock.send(resp.encode())
+        return
+
+    currentLevel = get_player_info(target_user=user, lookingFor='level')
+    boss_stats = make_quests(level=currentLevel)
+    save_active_quest(user_id, boss_stats)
+    
+    resp = f"PRIVMSG {channel} :@{user} You encounter a boss with {boss_stats['BaseHeath']} HP wielding a {boss_stats['Weapon']}! Use !attack to fight!\r\n"
+    sock.send(resp.encode())
 
 def handle_start(user, channel, sock):
     available_classes = get_classes()

@@ -8,22 +8,31 @@ from dotenv import load_dotenv
 load_dotenv()
 CLIENT_ID = os.getenv('CLIENT_ID')
 HOST = 'irc.chat.twitch.tv'
-PORT = 6667
+PORT = 6697
 NICK = 'rpg_chaos'
 CHANNELS = ['#starry0wolf']
 
 def connect():
-    """Connect to Twitch IRC with an auto-refreshed token."""
+    """Connect to Twitch IRC with SSL and auto-refreshed token."""
     token = get_valid_token()
+    
+    # Create plain socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
+    # Wrap with SSL
     context = ssl.create_default_context()
-    sock = socket.socket()
     ssl_sock = context.wrap_socket(sock, server_hostname=HOST)
+    
+    # Connect and authenticate
     ssl_sock.connect((HOST, PORT))
-    sock.send(f"PASS oauth:{token}\r\n".encode())
-    sock.send(f"NICK {NICK}\r\n".encode())
+    ssl_sock.send(f"PASS oauth:{token}\r\n".encode())
+    ssl_sock.send(f"NICK {NICK}\r\n".encode())
+    
+    # Join channels
     for channel in CHANNELS:
-        sock.send(f"JOIN {channel}\r\n".encode())
-    return sock
+        ssl_sock.send(f"JOIN {channel}\r\n".encode())
+    
+    return ssl_sock
 
 def who_am_i(token):
     headers = {

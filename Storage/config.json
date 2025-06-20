@@ -1,0 +1,41 @@
+{
+  "features": {
+    "tasks": true,
+    "quests": true,
+    "reminders": true,
+    "streaming": true,
+    "raids": true,
+    "shop": true
+  },
+  "commands": {
+    "!task": true,
+    "!todo": true,
+    "!done": true,
+    "!quest": true,
+    "!attack": true,
+    "!class": true,
+    "!level": true,
+    "!info": true,
+    "!stats": true,
+    "!remind": true,
+    "!reminder": true,
+    "!remindme": true,
+    "!reminders": true,
+    "!listreminders": true,
+    "!lurk": true,
+    "!raid": true,
+    "!followers": true,
+    "!intro": true,
+    "!chaos": false
+  },
+  "settings": {
+    "max_reminder_duration_hours": 24,
+    "max_tasks_per_user": 5,
+    "max_level": 100,
+    "exp_per_level": 100,
+    "gold_reward_min": 50,
+    "gold_reward_max": 150,
+    "exp_reward_min": 10,
+    "exp_reward_max": 30
+  }
+}
